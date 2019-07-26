@@ -222,7 +222,7 @@ class BaseAddressSpace(with_metaclass(registry.MetaclassRegistry, object)):
             return last_run.end
         return 0
 
-    def get_address_ranges(self, start=0, end=0xfffffffffffff):
+    def get_address_ranges(self, start=0, end=0xffffffffffffffff):
         """Generates the runs which fall between start and end.
 
         Note that start and end are here specified in the virtual address
@@ -273,7 +273,7 @@ class BaseAddressSpace(with_metaclass(registry.MetaclassRegistry, object)):
         if last_voffset_end > last_voffset:
             yield Run(start=last_voffset, end=last_voffset_end)
 
-    def merge_base_ranges(self, start=0, end=0xfffffffffffff):
+    def merge_base_ranges(self, start=0, end=0xffffffffffffffff):
         """Generates merged address ranges from get_mapping().
 
         This method is subtly different from get_address_ranges in that runs are

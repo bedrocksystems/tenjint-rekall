@@ -370,3 +370,7 @@ class ArmPagedMemory(addrspace.PagedReader):
 
     def end(self):
         return (2 ** 32) - 1
+
+    def __eq__(self, other):
+        return (super(ArmPagedMemory, self).__eq__(other) and
+                self.dtb == other.dtb and self.base == other.base)

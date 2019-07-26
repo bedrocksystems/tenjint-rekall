@@ -204,11 +204,18 @@ class LinuxFindDTB(AbstractLinuxCommandPlugin, core.FindDTB):
             as_class = addrspace.BaseAddressSpace.classes[impl]
             return as_class
 
+        elif architecture == "ARM64":
+            # An ARM64 address space.
+            self.session.logging.debug("Detected ARM64 Linux.")
+            impl = "Arm64PagedMemory"
+            as_class = addrspace.BaseAddressSpace.classes[impl]
+            return as_class
+
         return super(LinuxFindDTB, self).GetAddressSpaceImplementation()
 
     def dtb_hits(self):
         """Tries to locate the DTB."""
-        if self.profile.metadata("arch") in ("I386", "MIPS", "ARM"):
+        if self.profile.metadata("arch") in ("I386", "MIPS", "ARM", "ARM64"):
             yield self.profile.phys_addr(
                 self.profile.get_constant("swapper_pg_dir", is_address=True))
 

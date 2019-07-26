@@ -954,8 +954,8 @@ class Pointer(NativeType):
 
     @staticmethod
     def integer_to_address(value):
-        """Addresses only use 48 bits."""
-        return 0xffffffffffff & int(value)
+        """Use 64-bits."""
+        return 0xffffffffffffffff & int(value)
 
 
 class Pointer32(Pointer):
@@ -2573,7 +2573,7 @@ class Profile(with_metaclass(registry.MetaclassRegistry, object)):
 
     def integer_to_address(self, virtual_address):
         return virtual_address & self.constants.get(
-            "MaxPointer", 0xffffffffffff)
+            "MaxPointer", 0xffffffffffffffff)
 
 
 class TestProfile(Profile):

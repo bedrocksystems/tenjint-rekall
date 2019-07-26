@@ -3,6 +3,7 @@
 
 from rekall.plugins.addrspaces import amd64
 from rekall.plugins.addrspaces import arm
+from rekall.plugins.addrspaces import arm64
 from rekall.plugins.addrspaces import crash
 from rekall.plugins.addrspaces import elfcore
 from rekall.plugins.addrspaces import ewf
@@ -18,6 +19,7 @@ from rekall.plugins.addrspaces import mips
 from rekall.plugins.addrspaces import mmap_address_space
 from rekall.plugins.addrspaces import pagefile
 from rekall.plugins.addrspaces import vmi
+from rekall.plugins.addrspaces import tenjint
 
 try:
     from rekall.plugins.addrspaces import pmem
@@ -42,3 +44,4 @@ try:
     import rekall.plugins.addrspaces.aff4
 except ImportError:
     pass
+

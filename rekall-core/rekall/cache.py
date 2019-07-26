@@ -181,6 +181,73 @@ class TimedCache(Cache):
         return u"{\n" + u"\n".join(sorted(result)) + u"\n}"
 
 
+class TenjintCache(object):
+    """A limited Cache.
+
+    This is useful for live analysis to ensure that information is not stale.
+    """
+
+    def __init__(self, session):
+        super(TenjintCache, self).__init__()
+        self.data_v = {}
+        self.data_nv = {}
+        self.session = session
+        if session == None:
+            raise RuntimeError("Session must be set")
+
+    def Clear(self):
+        self.data_v.clear()
+        self.data_nv.clear()
+
+    def ClearVolatile(self):
+        self.data_v.clear()
+
+    def Flush(self):
+        """Called to sync the cache to external storage if required."""
+
+    def Get(self, item, default=None):
+        rv = self.data_v.get(item)
+        if rv is None:
+            rv = self.data_nv.get(item)
+        if rv is None:
+            rv = default
+        return rv
+
+    def Set(self, item, value, volatile=True):
+        if value is None:
+            self.data_v.pop(item, None)
+            self.data_nv.pop(item, None)
+        else:
+            if volatile:
+                self.data_v[item] = value
+            else:
+                self.data_nv[item] = value
+
+    def __str__(self):
+        """Print the contents somewhat concisely."""
+        result = []
+        for k, v in six.iteritems(self.data_v):
+            if isinstance(v, obj.BaseObject):
+                v = repr(v)
+
+            value = u"\n  ".join(str(v).splitlines())
+            if len(value) > 1000:
+                value = u"%s ..." % value[:1000]
+
+            result.append(u"  (V) %s = %s" % (k, value))
+        for k, v in six.iteritems(self.data_nv):
+            if isinstance(v, obj.BaseObject):
+                v = repr(v)
+
+            value = u"\n  ".join(str(v).splitlines())
+            if len(value) > 1000:
+                value = u"%s ..." % value[:1000]
+
+            result.append(u"  (NV) %s = %s" % (k, value))
+
+        return u"{\n" + u"\n".join(sorted(result)) + u"\n}"
+
+
 class FileCache(Cache):
     """A cache which syncs to a persistent on disk representation.
     """
@@ -371,5 +438,8 @@ def Factory(session, cache_type):
 
     if cache_type == "file":
         return FileCache(session)
+
+    if cache_type == "tenjint":
+        return TenjintCache(session)
 
     return Cache(session)

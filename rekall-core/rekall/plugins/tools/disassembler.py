@@ -68,6 +68,31 @@ class Instruction(object):
 
 
 class CapstoneInstruction(Instruction):
+
+    def __init__(self, insn, session=None, address_space=None):
+        self.address_space = address_space
+        self.insn = insn
+        self.address = insn.address
+        self.size = insn.size
+        self.mnemonic = insn.mnemonic
+        self._comment = ""
+        self.session = session
+        self.resolver = session.address_resolver
+
+    @utils.safe_property
+    def hexbytes(self):
+        return utils.SmartUnicode(binascii.hexlify(self.insn.bytes))
+
+    @utils.safe_property
+    def op_str(self):
+        return "{}\t{}".format(self.insn.mnemonic, self.insn.op_str)
+
+    @utils.safe_property
+    def comment(self):
+        return self._comment
+
+
+class CapstoneInstructionX86(Instruction):
     """A capstone decoded instruction."""
 
     # We need to build reverse maps to properly interpret capston
@@ -283,6 +308,8 @@ class Capstone(Disassembler):
         # This is not really supported yet.
         elif self.mode == "ARM":
             self.cs = capstone.Cs(capstone.CS_ARCH_ARM, capstone.CS_MODE_ARM)
+        elif self.mode == "ARM64":
+            self.cs = capstone.Cs(capstone.CS_ARCH_ARM64, capstone.CS_MODE_ARM)
         else:
             raise NotImplementedError(
                 "No disassembler available for this arch.")
@@ -292,9 +319,14 @@ class Capstone(Disassembler):
         self.cs.skipdata = True
 
     def disassemble(self, data, offset):
+        if self.mode == "I386" or self.mode == "AMD64":
+            insn_cls = CapstoneInstructionX86
+        else:
+            insn_cls = CapstoneInstruction
+
         for insn in self.cs.disasm(data, int(offset)):
-            yield CapstoneInstruction(insn, session=self.session,
-                                      address_space=self.address_space)
+            yield insn_cls(insn, session=self.session,
+                           address_space=self.address_space)
 
 
 class Disassemble(plugin.TypedProfileCommand, plugin.Command):
@@ -509,8 +541,11 @@ class Function(obj.BaseAddressComparisonMixIn, obj.BaseObject):
 
             # We are disassembling user space.
             if self.obj_offset < highest_usermode_address:
-                mode = self.obj_session.GetParameter(
-                    "process_context").address_mode
+                try:
+                    mode = self.obj_session.GetParameter(
+                        "process_context").address_mode
+                except AttributeError:
+                    pass
 
         # fall back to the kernel's mode.
         if not mode:

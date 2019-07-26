@@ -681,7 +681,7 @@ class Session(with_metaclass(registry.MetaclassRegistry, object)):
         # For volatile sessions we use a timed cache (which expires after a
         # short time).
         cache_type = self.GetParameter("cache", "memory")
-        if self.volatile:
+        if self.volatile and cache_type != "tenjint":
             cache_type = "timed"
 
         if self.cache:

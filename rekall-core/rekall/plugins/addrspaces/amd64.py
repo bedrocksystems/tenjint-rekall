@@ -135,10 +135,20 @@ class AMD64PagedMemory(intel.IA32PagedMemoryPae):
         # PDEs and PTEs we must test.
         for pml4e_index in range(0, 0x200):
             vaddr = pml4e_index << 39
+
+            # Sign extend
+            if pml4e_index >= 0x100:
+                vaddr |= 0xffff000000000000
+
             if vaddr > end:
                 return
 
             next_vaddr = (pml4e_index + 1) << 39
+
+            # Sign extend
+            if pml4e_index >= 0x100:
+                next_vaddr |= 0xffff000000000000
+
             if start >= next_vaddr:
                 continue
 

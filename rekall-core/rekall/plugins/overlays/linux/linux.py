@@ -986,6 +986,12 @@ class InodePermission(basic.Flags):
             return (self.v() & 0xF000) == mask
         return self.v() & mask
 
+class mm_struct(obj.Struct):
+    def __getattr__(self, attr):
+        if hasattr(self, "u1"):
+            return getattr(self.u1, attr)
+        else:
+            raise AttributeError
 
 class Linux(basic.RelativeOffsetMixin, basic.BasicClasses):
     METADATA = dict(
@@ -1009,6 +1015,7 @@ class Linux(basic.RelativeOffsetMixin, basic.BasicClasses):
             page=page, kgid_t=kgid_t, kuid_t=kuid_t,
             proc_dir_entry=proc_dir_entry,
             task_struct=task_struct,
+            mm_struct=mm_struct,
             timespec=timespec, inet_sock=inet_sock,
             ))
         profile.add_overlay(linux_overlay)
@@ -1036,6 +1043,9 @@ class Linux(basic.RelativeOffsetMixin, basic.BasicClasses):
         # but we do not support this.
         elif profile.metadata("arch") == "ARM":
             basic.Profile32Bits.Initialize(profile)
+
+        elif profile.metadata("arch") == "ARM64":
+            basic.ProfileLP64.Initialize(profile)
 
         elif profile.metadata("arch") == "MIPS":
             basic.ProfileMIPS32Bits.Initialize(profile)
@@ -1203,10 +1213,25 @@ class Linux(basic.RelativeOffsetMixin, basic.BasicClasses):
         page_offset_addr = obj.Pointer.integer_to_address(
             self.GetPageOffset())
 
-        if va_addr >= page_offset_addr:
-            return (va_addr - page_offset_addr)
+        if self.metadata("arch") == "ARM64":
+            VA_BITS = int(self.data["$CONFIG"]["CONFIG_ARM64_VA_BITS"])
+            PHYS_OFFSET = 0x40000000
+            KADDR_VOFFSET = (self.get_constant("_text") - 
+                             self.get_constant("_kernel_offset_le_lo32") -
+                             PHYS_OFFSET)
+            if not (va_addr & (1 << VA_BITS)):
+                return obj.NoneObject("Unable to translate VA 0x%x", va)
+            #elif (va_addr & (1 << (VA_BITS -1))):
+            #    self.session.logging.debug("MUH!")
+                #return (va_addr & ~page_offset_addr) + PHYS_OFFSET
+            #    return (va_addr & ~page_offset_addr)
+            else:
+                return (va_addr - KADDR_VOFFSET)
         else:
-            return obj.NoneObject("Unable to translate VA 0x%x", va)
+            if va_addr >= page_offset_addr:
+                return (va_addr - page_offset_addr)
+            else:
+                return obj.NoneObject("Unable to translate VA 0x%x", va)
 
     def GetPageOffset(self):
         """Gets the page offset."""
@@ -1257,6 +1282,10 @@ class Linux(basic.RelativeOffsetMixin, basic.BasicClasses):
             # 1568         default 0xC0000000
 
             result = 0xc0000000
+
+        elif self.metadata("arch") == "ARM64":
+            VA_BITS = int(self.data["$CONFIG"]["CONFIG_ARM64_VA_BITS"])
+            result = 0xffffffffffffffff - (1 << (VA_BITS - 1)) + 1
 
         else:
             return obj.NoneObject("No profile architecture set.")

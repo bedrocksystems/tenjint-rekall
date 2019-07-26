@@ -171,7 +171,7 @@ class LinuxConverter(ProfileConverter):
         for line in system_map.splitlines():
             try:
                 (address, _, symbol) = line.strip().split()
-                sys_map[symbol] = int(address, 16) & 0xFFFFFFFFFFFF
+                sys_map[symbol] = int(address, 16) & 0xFFFFFFFFFFFFFFFF
             except ValueError:
                 pass
 
@@ -221,6 +221,9 @@ class LinuxConverter(ProfileConverter):
 
         elif "arm_syscall" in result["$CONSTANTS"]:
             result["$METADATA"]["arch"] = "ARM"
+
+        elif "CONFIG_ARM64" in result["$CONFIG"]:
+            result["$METADATA"]["arch"] = "ARM64"
 
         elif largest_offset > 2**32:
             result["$METADATA"]["arch"] = "AMD64"
