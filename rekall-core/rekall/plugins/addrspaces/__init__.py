@@ -1,5 +1,8 @@
 # Load the core modules
 # pylint: disable=unused-import
+# Modifications made by BedRock Systems, Inc. on
+# Jul 26 2019,
+# which modifications are (c) 2020 BedRock Systems, Inc.
 
 from rekall.plugins.addrspaces import amd64
 from rekall.plugins.addrspaces import arm

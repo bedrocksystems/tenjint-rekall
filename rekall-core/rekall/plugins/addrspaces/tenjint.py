@@ -1,8 +1,9 @@
 # Rekall Memory Forensics
-# Copyright 2019 Bedrock Systems Inc. All Rights Reserved.
+# Copyright 2020 Bedrock Systems Inc. All Rights Reserved.
 #
 # Authors:
 # Jonas Pfoh <jonas@bedrocksystems.com>
+# Sebastian Vogl <sebastian@bedrocksystems.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by

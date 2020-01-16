@@ -1,9 +1,15 @@
 # Rekall Memory Forensics
 #
-# Copyright 2015 Google Inc. All Rights Reserved.
-
+# Copyright 2020 BedRock Systems, Inc.
+#
 # Authors:
-# Michael Cohen <scudette@google.com>
+# Sebastian Vogl <sebastian@bedrocksystems.com>
+# Jonas Pfoh     <jonas@bedrocksystems.com>
+#
+# Derived from rekall-core/rekall/plugins/addrspaces/arm.py
+#   Copyright 2015 Google Inc. All Rights Reserved.
+#   Authors:
+#   Michael Cohen <scudette@google.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by

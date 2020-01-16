@@ -1,6 +1,9 @@
 # Rekall Memory Forensics
 #
 # Copyright 2015 Google Inc. All Rights Reserved.
+# Modifications made by BedRock Systems, Inc. on
+# Jul 26 2019,
+# which modifications are (c) 2020 BedRock Systems, Inc.
 
 # Authors:
 # Michael Cohen <scudette@google.com>

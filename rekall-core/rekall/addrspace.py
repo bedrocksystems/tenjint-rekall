@@ -1,6 +1,9 @@
 # Rekall Memory Forensics
 # Copyright (C) 2007,2008 Volatile Systems
 # Copyright 2013 Google Inc. All Rights Reserved.
+# Modifications made by BedRock Systems, Inc. on
+# Jul 26 2019,
+# which modifications are (c) 2020 BedRock Systems, Inc.
 #
 # Original Source:
 # Copyright (C) 2004,2005,2006 4tphi Research

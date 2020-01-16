@@ -1,3 +1,7 @@
+# Modifications made by BedRock Systems, Inc. on
+# Jul 26 2019,
+# which modifications are (c) 2020 BedRock Systems, Inc.
+
 from future import standard_library
 standard_library.install_aliases()
 from builtins import str
