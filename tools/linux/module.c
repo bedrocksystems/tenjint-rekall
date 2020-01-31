@@ -1,6 +1,11 @@
 /*
   This module does absolutely nothing at all. We just build it with debugging
-  symbols and then read the DWARF symbols from it.  */
+  symbols and then read the DWARF symbols from it.
+
+  Modifications made by BedRock Systems, Inc. on
+  Jan 31 2020
+  which modifications are (c) 2020 BedRock Systems, Inc.
+*/
 
 #include <linux/kconfig.h>
 
@@ -426,7 +431,66 @@ struct slab slab;
 #define cycle_t u64
 #endif
 
-#if LINUX_VERSION_CODE > KERNEL_VERSION(4, 11, 7)
+#if LINUX_VERSION_CODE > KERNEL_VERSION(4, 14, 169)
+
+struct tk_read_base {
+	struct clocksource	*clock;
+	u64			mask;
+	u64			cycle_last;
+	u32			mult;
+	u32			shift;
+	u64			xtime_nsec;
+	ktime_t			base;
+	u64			base_real;
+};
+
+struct timekeeper {
+	struct tk_read_base	tkr_mono;
+	struct tk_read_base	tkr_raw;
+	u64			xtime_sec;
+	unsigned long		ktime_sec;
+	struct timespec64	wall_to_monotonic;
+	ktime_t			offs_real;
+	ktime_t			offs_boot;
+	ktime_t			offs_tai;
+	s32			tai_offset;
+	unsigned int		clock_was_set_seq;
+	u8			cs_was_changed_seq;
+	ktime_t			next_leap_ktime;
+	u64			raw_sec;
+
+	/* The following members are for timekeeping internal use */
+	u64			cycle_interval;
+	u64			xtime_interval;
+	s64			xtime_remainder;
+	u64			raw_interval;
+	/* The ntp_tick_length() value currently being used.
+	 * This cached copy ensures we consistently apply the tick
+	 * length for an entire tick, as ntp_tick_length may change
+	 * mid-tick, and we don't want to apply that new value to
+	 * the tick in progress.
+	 */
+	u64			ntp_tick;
+	/* Difference between accumulated time and NTP time in ntp
+	 * shifted nano seconds. */
+	s64			ntp_error;
+	u32			ntp_error_shift;
+	u32			ntp_err_mult;
+#ifdef CONFIG_DEBUG_TIMEKEEPING
+	long			last_warning;
+	/*
+	 * These simple flag variables are managed
+	 * without locks, which is racy, but they are
+	 * ok since we don't really care about being
+	 * super precise about how many events were
+	 * seen, just that a problem was observed.
+	 */
+	int			underflow_seen;
+	int			overflow_seen;
+#endif
+};
+
+#elif LINUX_VERSION_CODE > KERNEL_VERSION(4, 11, 7)
 
 struct tk_read_base {
   struct clocksource      *clock;

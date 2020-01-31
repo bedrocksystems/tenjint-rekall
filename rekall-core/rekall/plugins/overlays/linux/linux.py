@@ -761,11 +761,11 @@ class task_struct(obj.Struct):
             # Kernel 3.17 changes how start_time is stored. Now it's
             # in nsecs monotonic or boot based.
             start_timespec = self.obj_profile.timespec()
-            start_timespec.tv_sec = old_div(self.m("start_time"), 1000000000)
-            start_timespec.tv_nsec = self.m("start_time") % 1000000000
+            start_timespec.tv_sec = old_div(self.m("real_start_time"), 1000000000)
+            start_timespec.tv_nsec = self.m("real_start_time") % 1000000000
             boot_time = self.obj_profile.getboottime()
             start_time = self.obj_profile.UnixTimeStamp(
-                value = start_timespec.tv_sec - boot_time.tv_sec)
+                value = start_timespec.tv_sec + boot_time.tv_sec)
             return start_time
         return self.m("start_time").as_timestamp()
 
@@ -868,8 +868,8 @@ class timespec(obj.Struct):
 
     def as_timestamp(self):
         """Returns the time as a UnixTimestamp."""
-        the_time = self - self.obj_profile.getboottime(vm=self.obj_vm)
-        the_time = the_time.normalized_timespec()
+        #the_time = self - self.obj_profile.getboottime(vm=self.obj_vm)
+        the_time = self.normalized_timespec()
         return self.obj_profile.UnixTimeStamp(value=the_time.tv_sec.v())
 
 
@@ -1193,6 +1193,13 @@ class Linux(basic.RelativeOffsetMixin, basic.BasicClasses):
         return self.ns_to_timespec(nsec)
 
     def ns_to_timespec(self, nsec):
+        if (self.metadata("arch") == "ARM64" or
+            self.metadata("arch") == "AMD64"):
+            return self.ns_to_timespec64(nsec)
+        else:
+            return self.ns_to_timespec32(nsec)
+
+    def ns_to_timespec32(self, nsec):
         """Transforms nanoseconds to a timespec."""
         # http://elixir.free-electrons.com/linux/v4.13.5/source/kernel/time/time.c#L486
         ts = self.timespec()
@@ -1209,6 +1216,22 @@ class Linux(basic.RelativeOffsetMixin, basic.BasicClasses):
 
             ts.tv_nsec = rem
         return ts
+
+    def ns_to_timespec64(self, nsec):
+        ts = self.timespec()
+
+        if nsec > 0:
+            ts.tv_sec, ts.tv_nsec = divmod(nsec, timespec.NSEC_PER_SEC)
+        elif nsec < 0:
+            ts.tv_sec, rem = divmod(-nsec -1, timespec.NSEC_PER_SEC)
+            ts.tv_sec = -ts.tv_sec - 1
+            ts.tv_nsec = timespec.NSEC_PER_SEC - rem - 1
+        else:
+            ts.tv_sec = 0
+            ts.tv_nsec = 0
+
+        return ts
+
 
     def phys_addr(self, va):
         """Returns the physical address of a given virtual address va.
