@@ -3,7 +3,7 @@
 # Copyright (c) 2011 Michael Cohen <scudette@gmail.com>
 # Copyright 2013 Google Inc. All Rights Reserved.
 # Modifications made by BedRock Systems, Inc. on
-# Jul 26 2019,
+# Jul 26 2019, Jan 31 2020
 # which modifications are (c) 2020 BedRock Systems, Inc.
 #
 # This program is free software; you can redistribute it and/or modify
@@ -1079,6 +1079,15 @@ class Linux(basic.RelativeOffsetMixin, basic.BasicClasses):
                 task_struct_def[1][field] = field_definition
 
             profile.vtypes["task_struct"] = task_struct_def
+
+        lin_timespec = profile.vtypes.get("timespec")
+        if lin_timespec is None:
+            # Timespec struct was renamed to timespec64 in later linux versions
+            lin_timespec = profile.vtypes.get("timespec64")
+            if lin_timespec is None:
+                RuntimeError("Profile does not have a timespec struct")
+
+            profile.vtypes["timespec"] = lin_timespec
 
     def GetImageBase(self):
         if self.image_base is None:
