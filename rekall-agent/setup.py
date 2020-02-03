@@ -2,6 +2,9 @@
 
 # Rekall
 # Copyright 2016 Google Inc. All Rights Reserved.
+# Modifications made by BedRock Systems, Inc. on
+# Feb 03 2020,
+# which modifications are (c) 2020 BedRock Systems, Inc.
 #
 # Authors:
 # Michael Cohen <scudette@google.com>
@@ -45,7 +48,7 @@ install_requires = [
     "rekall-lib >= 1.7.0rc1, < 1.8",
     "sseclient==0.0.18",
     "rekall-core >= 1.7.0rc1, < 1.8",
-    "requests==2.18.1",
+    "requests==2.20.0",
     "httplib2==0.9.2",
     "oauth2client==3.0.0",
     "filelock==2.0.6",
