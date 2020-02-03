@@ -1,5 +1,8 @@
 # Rekall Memory Forensics
 # Copyright 2014 Google Inc. All Rights Reserved.
+# Modifications made by BedRock Systems, Inc. on
+# Feb 03 2020
+# which modifications are (c) 2020 BedRock Systems, Inc.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -48,15 +51,18 @@ class KernelModule(address_resolver.Module):
     """
 
     def __init__(self, session=None, **kwargs):
+        offset = session.GetCache("kernel_slide")
+        if offset is None:
+            offset = 0
+
         super(KernelModule, self).__init__(
             # Check if the address appears in the kernel binary.
             start=obj.Pointer.integer_to_address(
-                session.profile.get_constant("_text")),
-            end=session.profile.get_constant("_end"),
+                session.profile.get_constant("_text") + offset),
+            end=session.profile.get_constant("_end") + offset,
             name="linux",
             profile=session.profile,
             session=session, **kwargs)
-
 
 class LinuxAddressResolver(address_resolver.AddressResolverMixin,
                            common.LinuxPlugin):
