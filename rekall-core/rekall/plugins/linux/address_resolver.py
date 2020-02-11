@@ -23,25 +23,46 @@
 
 from builtins import str
 __author__ = "Michael Cohen <scudette@gmail.com>"
+
+import re
+
+from rekall_lib import utils
+
 from rekall import obj
 from rekall.plugins.common import address_resolver
 from rekall.plugins.linux import common
 
-class LKMModule(address_resolver.Module):
+class MapModule(address_resolver.Module):
+    """A module representing a memory mapping."""
+
+class ELFModule(address_resolver.Module):
+    """ELF module base class."""
+
+class LKMModule(ELFModule):
     """A Linux kernel module."""
 
     def __init__(self, module, **kwargs):
         self.module = module
-        super(LKMModule, self).__init__(
+        super().__init__(
             name=str(module.name),
             start=module.base,
             end=module.end,
             **kwargs)
 
+class LibModule(ELFModule):
+    """A Linux shared object module."""
 
-class MapModule(address_resolver.Module):
-    """A module representing a memory mapping."""
-
+    def __init__(self, module, **kwargs):
+        name = module.vm_file.f_path.dentry.d_name.name.dereference()
+        if name == None:
+            raise ValueError("missing module name")
+        self.module = module
+        self.full_name = str(name)
+        super().__init__(
+            name=LinuxAddressResolver.NormalizeModuleName(self.full_name),
+            start=module.vm_start,
+            end=module.vm_end,
+            **kwargs)
 
 class KernelModule(address_resolver.Module):
     """A Fake object which makes the kernel look like a module.
@@ -68,6 +89,42 @@ class LinuxAddressResolver(address_resolver.AddressResolverMixin,
                            common.LinuxPlugin):
     """A Linux specific address resolver plugin."""
 
+    # The format of a symbol name. Used by get_address_by_name().
+    ADDRESS_NAME_REGEX = re.compile(
+        r"(?P<deref>[*])?"              # Pointer dereference.
+
+        r"((?P<address>0x[0-9A-Fa-f]+)|" # Alternative - Either an address, or,
+
+        r"(?P<module>[A-Za-z_0-9\-\.\\]+)" # Module name - can include extension
+                                           # (.exe, .sys)
+
+        r"!?"                           # ! separates module name from symbol
+                                        # name.
+
+        r"(?P<symbol>[^ +-]+)?"         # Symbol name.
+        r")"                            # End alternative.
+
+        r"(?P<op> *[+-] *)?"            # Possible arithmetic operator.
+        r"(?P<offset>[0-9a-fA-Fx]+)?")  # Possible hex offset.
+
+    @staticmethod
+    def NormalizeModuleName(module_name):
+        if module_name is not None:
+            module_name = utils.SmartUnicode(module_name)
+            module_name = re.split(r"[/\\]", module_name)[-1]
+
+            # remove extention and everything after (e.g., libc.so.2.29)
+            m = re.compile("(.*)\.so(\.[0-9\.]+)?").match(module_name)
+            if m:
+                module_name = m.group(1)
+
+            # remove version in filename (e.g., libc-2.29)
+            m = re.compile("(.*)-[0-9]+\.[0-9]+").match(module_name)
+            if m:
+                module_name = m.group(1)
+
+            return module_name
+
     def _EnsureInitialized(self):
         if self._initialized:
             return
@@ -82,10 +139,14 @@ class LinuxAddressResolver(address_resolver.AddressResolverMixin,
         task = self.session.GetParameter("process_context")
 
         for vma in task.mm.mmap.walk_list("vm_next"):
-            start = vma.vm_start
-            end = vma.vm_end
-            self.AddModule(MapModule(
-                name="map_%#x" % start,
-                start=start, end=end, session=self.session))
+            try:
+                mod = LibModule(vma, session=self.session)
+            except ValueError:
+                start = vma.vm_start
+                end = vma.vm_end
+                mod = MapModule(
+                    name="map_%#x" % start,
+                    start=start, end=end, session=self.session)
+            self.AddModule(mod)
 
         self._initialized = True
