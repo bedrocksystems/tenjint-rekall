@@ -187,8 +187,7 @@ class DW_TAG_structure_type(DIETag):
             return
 
         if self.name in vtype and vtype[self.name][0] != self.size:
-            self.session.logging.warning(
-                "Structs of different sizes but same name")
+            print("Structs of different sizes but same name")
 
         count = 1
         result = [self.size, {}]
@@ -264,7 +263,11 @@ class DW_TAG_subrange_type(DIETag):
         super(DW_TAG_subrange_type, self).__init__(die, types, parents)
 
         if "DW_AT_upper_bound" in self.attributes:
-            self.parent.count = self.attributes['DW_AT_upper_bound'].value + 1
+            try:
+                self.parent.count = self.attributes['DW_AT_upper_bound'].value + 1
+            except TypeError:
+                print(self.attributes['DW_AT_upper_bound'])
+                self.parent.count = max(self.attributes['DW_AT_upper_bound'].value) + 1
 
 
 _DWARF_EXPR_DUMPER_CACHE = {}

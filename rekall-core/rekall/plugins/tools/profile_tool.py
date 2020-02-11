@@ -100,6 +100,8 @@ import os
 import re
 import io
 
+from elftools.elf import elffile
+
 from rekall import io_manager
 from rekall import obj
 from rekall import plugin
@@ -125,9 +127,12 @@ class ProfileConverter(with_metaclass(registry.MetaclassRegistry, object)):
 
     def SelectFile(self, regex):
         """Reads the content of the first file which matches regex."""
-        for f in self.input.ListFiles():
-            if re.search(regex, f, re.I):
-                return self.input.Open(f).read()
+        try:
+            for f in self.input.ListFiles():
+                if re.search(regex, f, re.I):
+                    return self.input.Open(f).read()
+        except AttributeError:
+            raise RuntimeError("File not an archive")
 
     def BuildProfile(self, system_map, vtypes, config=None):
         _ = config
@@ -144,6 +149,71 @@ class ProfileConverter(with_metaclass(registry.MetaclassRegistry, object)):
 
     def Convert(self):
         raise RuntimeError("Unknown profile format.")
+
+class ELFConverter(ProfileConverter):
+    BASE_PROFILE_CLASS = "ELF"
+
+    def __init__(self, input, profile_class=None, session=None):
+        super().__init__(input, profile_class, session)
+        self.__elffile = None
+
+    @property
+    def _elffile(self):
+        if self.__elffile is None:
+            self.__elffile = elffile.ELFFile(self.input)
+        return self.__elffile
+
+    def _get_build_id(self):
+        id_sec = self._elffile.get_section_by_name(".note.gnu.build-id")
+        for note in id_sec.iter_notes():
+            if note["n_type"] == "NT_GNU_BUILD_ID":
+                return note["n_desc"]
+        raise RuntimeError("unable to extract build id")
+
+    def _get_arch(self):
+        if self._elffile["e_machine"] == "EM_386":
+            return "I386"
+        elif self._elffile["e_machine"] == "EM_X86_64":
+            return "AMD64"
+        elif self._elffile["e_machine"] == "EM_ARM":
+            return "ARM"
+        elif self._elffile["e_machine"] == "EM_AARCH64":
+            return "ARM64"
+        else:
+            raise ValueError("Unsupported Architecture")
+
+    def _get_syms(self):
+        sym_sec = self._elffile.get_section_by_name(".symtab")
+
+        rv = dict()
+        for sym in sym_sec.iter_symbols():
+            rv[sym.name] = sym["st_value"]
+        return rv
+
+    def BuildProfile(self, syms, vtypes):
+        if self.profile_class is None:
+            self.profile_class = self.BASE_PROFILE_CLASS
+
+        enums = vtypes.pop("$ENUMS", {})
+        reverse_enums = vtypes.pop("$REVENUMS", {})
+
+        result = super().BuildProfile(syms, vtypes)
+        result["$ENUMS"] = enums
+        result["$REVENUMS"] = reverse_enums
+
+        result["$METADATA"]["arch"] = self._get_arch()
+        result["$METADATA"]["guid"] = self._get_build_id()
+
+        return result
+
+    def Convert(self):
+        parser = dwarfparser.DWARFParser(self.input, session=self.session)
+
+        syms = self._get_syms()
+
+        profile_file = self.BuildProfile(syms, parser.VType())
+        return profile_file
+        # raise RuntimeError("Unknown profile format.")
 
 
 class LinuxConverter(ProfileConverter):
@@ -363,7 +433,7 @@ class ConvertProfile(plugin.TypedProfileCommand, plugin.Command):
     def ConvertProfile(self, input):
         """Converts the input profile to a new standard profile in output."""
         # First detect what kind of profile the input profile is.
-        for converter in (LinuxConverter, OSXConverter):
+        for converter in (LinuxConverter, OSXConverter, ELFConverter):
             try:
                 profile = converter(input, session=self.session).Convert()
                 return profile
@@ -387,10 +457,7 @@ class ConvertProfile(plugin.TypedProfileCommand, plugin.Command):
             input = io_manager.Factory(
                 self.plugin_args.source, session=self.session, mode="r")
         except IOError:
-            self.session.logging.critical(
-                "Input profile file %s could not be opened.",
-                self.plugin_args.source)
-            return
+            input = open(self.plugin_args.source, "rb")
 
         with input:
             profile = self.ConvertProfile(input)

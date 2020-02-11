@@ -66,7 +66,7 @@ install_requires = [
     "psutil >= 5.0, < 6.0",
     'pyaff4 >= 0.26, < 0.30',
     'pycryptodome==3.9.6',
-    'pyelftools==0.25',
+    'pyelftools==0.26',
     'pyparsing==2.1.5',
     'python-dateutil==2.6.1',
     'pytsk3==20170802',
