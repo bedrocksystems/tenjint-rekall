@@ -131,13 +131,13 @@ elf_overlays = {
             'target': 'uint8_t'}]],
 
         'segments': lambda x: x.cast("Array",
-            offset=x.e_phoff,
+            offset=x.obj_offset + x.e_phoff,
             target='elf64_phdr',
             target_size=x.e_phentsize,
             count=x.e_phnum),
 
         'sections': lambda x: x.cast("Array",
-            offset=x.e_shoff,
+            offset=x.obj_offset + x.e_shoff,
             target='elf64_shdr',
             target_size=x.e_shentsize,
             count=x.e_shnum),
@@ -271,37 +271,37 @@ class elf64_shdr(obj.Struct):
         context = dict(section=self, **self.obj_context)
         if self.sh_type == "SHT_STRTAB":
             return self.cast("IndexedListArray",
-                             offset=self.sh_offset,
+                             offset=self.obj_offset + self.sh_offset,
                              maximum_size=self.sh_size,
                              context=context,
                              target="String")
 
         elif self.sh_type == "SHT_GNU_verneed":
             return self.cast("LinkedListArray",
-                             offset=self.sh_offset,
+                             offset=self.obj_offset + self.sh_offset,
                              next_member=lambda x, item: item.obj_offset + item.vn_next,
                              maximum_size=self.sh_size,
                              context=context,
                              target="elf64_verneed")
 
         elif self.sh_type == "SHT_NOTE":
-            return self.cast("elf64_note", offset=sh_offset)
+            return self.cast("elf64_note", offset=self.obj_offset + self.sh_offset)
 
         elif self.sh_type == "SHT_GNU_versym":
             return self.cast("Array",
-                             offset=self.sh_offset,
+                             offset=self.obj_offset + self.sh_offset,
                              count=self.sh_size / 2,
                              context=context,
                              target="short unsigned int")
 
         elif self.sh_type == "SHT_DYNSYM":
             return self.cast("Array",
-                             offset=self.sh_offset,
+                             offset=self.obj_offset + self.sh_offset,
                              size=self.sh_size,
                              context=context,
                              target="elf64_sym")
 
-        return self.cast("String", offset=self.sh_offset,
+        return self.cast("String", offset=self.obj_offset + self.sh_offset,
                          length=self.sh_size,
                          context=context,
                          term=None)
@@ -332,3 +332,31 @@ class ELFProfile(basic.ProfileLP64, basic.BasicClasses):
     def __init__(self, **kwargs):
         super(ELFProfile, self).__init__(**kwargs)
         ELFFileImplementation.Modify(self)
+
+class ELF64(object):
+    """A convenience object to access ELF file information."""
+
+    def __init__(self, address_space=None, image_base=0, session=None):
+        """Constructor.
+
+        Args:
+          address_space: An address space to examine.
+
+          image_base: The address of the ELF header in the virtual address
+            space.
+        """
+        self.session = session
+        if session is None:
+            raise RuntimeError("Session must be provided.")
+
+        # Use the session to load the elf profile.
+        self.profile = ELFProfile(session=session)
+
+        self.address_space = address_space
+        self.image_base = image_base
+
+    @property
+    def hdr(self):
+        return self.profile.elf64_hdr(vm=self.address_space,
+                                      offset=self.image_base)
+

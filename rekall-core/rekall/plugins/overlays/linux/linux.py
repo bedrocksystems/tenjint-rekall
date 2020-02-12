@@ -769,6 +769,18 @@ class task_struct(obj.Struct):
             return start_time
         return self.m("start_time").as_timestamp()
 
+    @utils.safe_property
+    def is_32bit(self):
+        try:
+            # AArch64
+            # 1 is the value of MMCF_AARCH32 on AArch64
+            rv = bool(self.mm.context.flags & 0x1)
+        except AttributeError:
+            # x86_64
+            # 17 is the value of TIF_IA32 on x86_64
+            rv = (self.mm.context.ia32_compat == 17)
+        return rv
+
     def get_path(self, filp):
         """Resolve the dentry, vfsmount relative to this task's chroot.
 

@@ -31,6 +31,7 @@ from rekall_lib import utils
 from rekall import obj
 from rekall.plugins.common import address_resolver
 from rekall.plugins.linux import common
+from rekall.plugins.overlays.linux import elf
 
 class MapModule(address_resolver.Module):
     """A module representing a memory mapping."""
@@ -41,7 +42,7 @@ class ELFModule(address_resolver.Module):
 class LKMModule(ELFModule):
     """A Linux kernel module."""
 
-    def __init__(self, module, **kwargs):
+    def __init__(self, module=None, **kwargs):
         self.module = module
         super().__init__(
             name=str(module.name),
@@ -49,20 +50,43 @@ class LKMModule(ELFModule):
             end=module.end,
             **kwargs)
 
-class LibModule(ELFModule):
-    """A Linux shared object module."""
-
-    def __init__(self, module, **kwargs):
-        name = module.vm_file.f_path.dentry.d_name.name.dereference()
-        if name == None:
-            raise ValueError("missing module name")
-        self.module = module
-        self.full_name = str(name)
+class LibSectionModule(address_resolver.Module):
+    def __init__(self, full_name=None, module=None, **kwargs):
         super().__init__(
-            name=LinuxAddressResolver.NormalizeModuleName(self.full_name),
             start=module.vm_start,
             end=module.vm_end,
             **kwargs)
+        self.full_name = full_name
+        self.module = module
+        self.parent = None
+
+class LibModule(ELFModule):
+    """A Linux shared object module."""
+
+    def __init__(self, full_name=None, is_32bit=None, **kwargs):
+        super().__init__(
+            start=2**64,
+            end=0,
+            **kwargs)
+        self.is_32bit = is_32bit
+        self.full_name = full_name
+        self.children = dict()
+
+    def add_child(self, child):
+        self.children[child.start] = child
+        child.parent = self
+        if child.start < self.start:
+            self.start = child.start
+        if child.end > self.end:
+            self.end = child.end
+
+    def _get_elf_file(self):
+        if self.is_32bit:
+            raise RuntimeError("32-bit libs are unsupported")
+        else:
+            return elf.ELF64(
+                address_space=self.session.GetParameter("default_address_space"),
+                image_base=self.start, session=self.session)
 
 class KernelModule(address_resolver.Module):
     """A Fake object which makes the kernel look like a module.
@@ -125,6 +149,30 @@ class LinuxAddressResolver(address_resolver.AddressResolverMixin,
 
             return module_name
 
+    def AddVMA(self, vma, is_32bit):
+        name = vma.vm_file.f_path.dentry.d_name.name.dereference()
+        if name == None:
+            start = vma.vm_start
+            end = vma.vm_end
+            mod = MapModule(
+                name="map_%#x" % start,
+                start=start, end=end, session=self.session)
+            self.AddModule(mod)
+        else:
+            # Linux maps each section of an elf file contiguously in memory
+            full_name = str(name)
+            name = self.NormalizeModuleName(full_name)
+            if name not in self._modules_by_name:
+                self._modules_by_name[name] = LibModule(full_name=full_name,
+                                                        is_32bit=is_32bit,
+                                                        name=name,
+                                                        session=self.session)
+            child_mod = LibSectionModule(full_name=full_name, module=vma,
+                                         name=name, session=self.session)
+            self._modules_by_name[name].add_child(child_mod)
+            self._address_ranges.insert(child_mod.start, child_mod.end,
+                                        child_mod)
+
     def _EnsureInitialized(self):
         if self._initialized:
             return
@@ -134,19 +182,11 @@ class LinuxAddressResolver(address_resolver.AddressResolverMixin,
 
         # Add LKMs.
         for kmod in self.session.plugins.lsmod().get_module_list():
-            self.AddModule(LKMModule(kmod, session=self.session))
+            self.AddModule(LKMModule(module=kmod, session=self.session))
 
         task = self.session.GetParameter("process_context")
 
         for vma in task.mm.mmap.walk_list("vm_next"):
-            try:
-                mod = LibModule(vma, session=self.session)
-            except ValueError:
-                start = vma.vm_start
-                end = vma.vm_end
-                mod = MapModule(
-                    name="map_%#x" % start,
-                    start=start, end=end, session=self.session)
-            self.AddModule(mod)
+            self.AddVMA(vma, task.is_32bit)
 
         self._initialized = True
