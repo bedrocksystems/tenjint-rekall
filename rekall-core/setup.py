@@ -3,7 +3,7 @@
 # Rekall
 # Copyright 2013 Google Inc. All Rights Reserved.
 # Modifications made by BedRock Systems, Inc. on
-# Jul 26 2019, Feb 03 2020,
+# Jul 26 2019, Feb 03 2020, Feb 12 2020,
 # which modifications are (c) 2020 BedRock Systems, Inc.
 #
 # Authors:

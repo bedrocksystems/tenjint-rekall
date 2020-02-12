@@ -1,6 +1,9 @@
 # Rekall Memory Forensics
 # Copyright (c) 2012 Michael Cohen <scudette@gmail.com>
 # Copyright 2013 Google Inc. All Rights Reserved.
+# Modifications made by BedRock Systems, Inc. on
+# Feb 12 2020,
+# which modifications are (c) 2020 BedRock Systems, Inc.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
