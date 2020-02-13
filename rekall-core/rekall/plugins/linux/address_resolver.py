@@ -1,7 +1,8 @@
 # Rekall Memory Forensics
 # Copyright 2014 Google Inc. All Rights Reserved.
 # Modifications made by BedRock Systems, Inc. on
-# Feb 03 2020, Feb 11 2020, Feb 12 2020,
+# Feb 03 2020, Feb 11 2020, Feb 12 2020, Feb 13 2020,
+# Feb 18 2020,
 # which modifications are (c) 2020 BedRock Systems, Inc.
 #
 # This program is free software; you can redistribute it and/or modify
@@ -63,14 +64,17 @@ class LibSectionModule(address_resolver.Module):
 class LibModule(ELFModule):
     """A Linux shared object module."""
 
-    def __init__(self, full_name=None, is_32bit=None, **kwargs):
+    _profile = None
+
+    def __init__(self, full_name=None, is_32bit=None, address_space=None, **kwargs):
         super().__init__(
             start=2**64,
             end=0,
             **kwargs)
-        self.is_32bit = is_32bit
         self.full_name = full_name
+        self.is_32bit = is_32bit
         self.children = dict()
+        self.address_space = address_space
 
     def add_child(self, child):
         self.children[child.start] = child
@@ -79,14 +83,32 @@ class LibModule(ELFModule):
             self.start = child.start
         if child.end > self.end:
             self.end = child.end
+        self.profile.image_base = self.start
 
-    def _get_elf_file(self):
-        if self.is_32bit:
-            raise RuntimeError("32-bit libs are unsupported")
-        else:
-            return elf.ELF64(
-                address_space=self.session.GetParameter("default_address_space"),
-                image_base=self.start, session=self.session)
+    @property
+    def _profile_name(self):
+        return "linuxuser/{}/{}".format("32" if self.is_32bit else "64", self.full_name)
+
+    def reset(self):
+        self._profile = None
+
+    @utils.safe_property
+    def profile(self):
+        if self._profile is None:
+            self._profile = self.session.LoadProfile(self._profile_name)
+        return self._profile
+
+    @profile.setter
+    def profile(self, value):
+        """Allow the profile for this module to be overridden."""
+        self._profile = value
+        if self._profile is not None:
+            self._profile.image_base = self.start
+
+    @property
+    def hdr(self):
+        return self.profile.elf64_hdr(vm=self.address_space,
+                                      offset=self.start)
 
 class KernelModule(address_resolver.Module):
     """A Fake object which makes the kernel look like a module.
@@ -149,7 +171,7 @@ class LinuxAddressResolver(address_resolver.AddressResolverMixin,
 
             return module_name
 
-    def AddVMA(self, vma, is_32bit):
+    def AddVMA(self, vma, is_32bit, address_space):
         name = vma.vm_file.f_path.dentry.d_name.name.dereference()
         if name == None:
             start = vma.vm_start
@@ -164,9 +186,10 @@ class LinuxAddressResolver(address_resolver.AddressResolverMixin,
             name = self.NormalizeModuleName(full_name)
             if name not in self._modules_by_name:
                 self._modules_by_name[name] = LibModule(full_name=full_name,
-                                                        is_32bit=is_32bit,
-                                                        name=name,
-                                                        session=self.session)
+                                                    is_32bit=is_32bit,
+                                                    address_space=address_space,
+                                                    name=name,
+                                                    session=self.session)
             child_mod = LibSectionModule(full_name=full_name, module=vma,
                                          name=name, session=self.session)
             self._modules_by_name[name].add_child(child_mod)
@@ -187,6 +210,6 @@ class LinuxAddressResolver(address_resolver.AddressResolverMixin,
         task = self.session.GetParameter("process_context")
 
         for vma in task.mm.mmap.walk_list("vm_next"):
-            self.AddVMA(vma, task.is_32bit)
+            self.AddVMA(vma, task.is_32bit, self.session.default_address_space)
 
         self._initialized = True

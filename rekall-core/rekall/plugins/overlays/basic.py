@@ -1,6 +1,9 @@
 # Rekall Memory Forensics
 #
 # Copyright 2013 Google Inc. All Rights Reserved.
+# Modifications made by BedRock Systems, Inc. on
+# Feb 18 2020,
+# which modifications are (c) 2020 BedRock Systems, Inc.
 #
 # Authors:
 # Copyright (C) 2012 Michael Cohen <scudette@users.sourceforge.net>
@@ -793,6 +796,19 @@ class Profile32Bits(obj.Profile):
                                    MaxPointer=2 ** 32 - 1))
 
 
+class ProfileARM(obj.Profile):
+    """Basic profile for 32 bit Linux ARM systems."""
+    METADATA = dict(
+        arch="ARM",
+        data_model="ILP32"
+    )
+
+    @classmethod
+    def Initialize(cls, profile):
+        super(Profile32Bits, cls).Initialize(profile)
+        profile.add_classes(native_types.ILP32)
+
+
 class ProfileLLP64(obj.Profile):
     """Basic profile for 64 bit Windows systems."""
     METADATA = dict(
@@ -812,6 +828,19 @@ class ProfileLP64(obj.Profile):
     """Basic profile for 64 bit Linux systems."""
     METADATA = dict(
         arch="AMD64",
+        data_model="LP64"
+    )
+
+    @classmethod
+    def Initialize(cls, profile):
+        super(ProfileLP64, cls).Initialize(profile)
+        profile.add_classes(native_types.LP64)
+
+
+class ProfileARM64(obj.Profile):
+    """Basic profile for 64 bit ARM Linux systems."""
+    METADATA = dict(
+        arch="ARM64",
         data_model="LP64"
     )
 

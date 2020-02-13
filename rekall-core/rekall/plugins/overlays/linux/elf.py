@@ -2,7 +2,7 @@
 #
 # Copyright 2013 Google Inc. All Rights Reserved.
 # Modifications made by BedRock Systems, Inc. on
-# Feb 12 2020,
+# Feb 12 2020, Feb 13 2020, Feb 18 2020,
 # which modifications are (c) 2020 BedRock Systems, Inc.
 #
 # Authors:
@@ -328,6 +328,13 @@ class ELFFileImplementation(obj.ProfileModification):
         profile.add_overlay(elf_overlays)
 
 
+class ELF32FileImplementation(obj.ProfileModification):
+    """An implementation of a parser for ELF files."""
+
+    @classmethod
+    def Modify(cls, profile):
+        raise NotImplementedError()
+
 
 class ELFProfile(basic.ProfileLP64, basic.BasicClasses):
     """A profile for ELF files."""
@@ -336,30 +343,35 @@ class ELFProfile(basic.ProfileLP64, basic.BasicClasses):
         super(ELFProfile, self).__init__(**kwargs)
         ELFFileImplementation.Modify(self)
 
-class ELF64(object):
-    """A convenience object to access ELF file information."""
 
-    def __init__(self, address_space=None, image_base=0, session=None):
-        """Constructor.
+class ELF(basic.RelativeOffsetMixin, basic.BasicClasses):
+    """A profile for 64-bit ELF images."""
 
-        Args:
-          address_space: An address space to examine.
+    image_base = 0
 
-          image_base: The address of the ELF header in the virtual address
-            space.
-        """
-        self.session = session
-        if session is None:
-            raise RuntimeError("Session must be provided.")
+    def GetImageBase(self):
+        return self.image_base
 
-        # Use the session to load the elf profile.
-        self.profile = ELFProfile(session=session)
+    def copy(self):
+        result = super().copy()
+        result.image_base = self.image_base
+        return result
 
-        self.address_space = address_space
-        self.image_base = image_base
+    @classmethod
+    def Initialize(cls, profile):
+        super().Initialize(profile)
 
-    @property
-    def hdr(self):
-        return self.profile.elf64_hdr(vm=self.address_space,
-                                      offset=self.image_base)
-
+        if profile.metadata("arch") == "AMD64":
+            basic.ProfileLP64.Initialize(profile)
+            ELFFileImplementation.Modify(profile)
+        elif profile.metadata("arch") == "I386":
+            basic.Profile32Bits.Initialize(profile)
+            ELF32FileImplementation.Modify(profile)
+        elif profile.metadata("arch") == "ARM":
+            basic.ProfileARM.Initialize(profile)
+            ELF32FileImplementation.Modify(profile)
+        elif profile.metadata("arch") == "ARM64":
+            basic.ProfileARM64.Initialize(profile)
+            ELFFileImplementation.Modify(profile)
+        else:
+            raise RuntimeError("Unsupported arch")
