@@ -3,7 +3,7 @@
 # Rekall Memory Forensics
 # Copyright 2013 Google Inc. All Rights Reserved.
 # Modifications made by BedRock Systems, Inc. on
-# Jul 26 2019, Feb 12 2020,
+# Jul 26 2019, Feb 12 2020, Feb 18 2020,
 # which modifications are (c) 2020 BedRock Systems, Inc.
 #
 # Author: Michael Cohen scudette@google.com
@@ -468,6 +468,48 @@ class ConvertProfile(plugin.TypedProfileCommand, plugin.Command):
                     self.session.logging.info("Converted %s to %s",
                                               input, output.name)
 
+class ConvertELFProfile(plugin.TypedProfileCommand, plugin.Command):
+    """Convert a profile from ELF to the Rekall format.
+
+    The Rekall profile format is optimized for loading at runtime. This plugin
+    produces a Rekall profile from ELF sources.
+    """
+
+    __name = "convert_elf_profile"
+
+    __args = [
+        dict(name="source", positional=True, required=True,
+             help="Filename of profile to read."),
+
+        dict(name="out_dir", positional=True, required=True,
+             help="Path for output file."),
+    ]
+
+    @property
+    def source_filename(self):
+        return self.plugin_args.source.split("/")[-1]
+
+    def ConvertProfile(self, input):
+        """Converts the input profile to a new standard profile in output."""
+        return ELFConverter(input, session=self.session).Convert()
+
+    def render(self, renderer):
+        with open(self.plugin_args.source, "rb") as input:
+            profile = self.ConvertProfile(input)
+            if profile:
+                is_32bit = (True if (profile["$METADATA"]["arch"] == "I386" or
+                                     profile["$METADATA"]["arch"] == "ARM")
+                            else False)
+                out_path = os.path.join(self.plugin_args.out_dir,
+                                        "linuxuser",
+                                        "32" if is_32bit else "64")
+                os.makedirs(out_path, exist_ok=True)
+                out_file = os.path.join(out_path,
+                                        self.source_filename+".gz")
+                with gzip.open(filename=out_file, mode="wt") as output:
+                    output.write(utils.PPrint(profile))
+                    self.session.logging.info("Converted %s to %s",
+                                              input, output.name)
 
 class TestConvertProfile(testlib.DisabledTest):
     PARAMETERS = dict(commandline="convert_profile")
